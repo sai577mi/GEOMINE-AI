@@ -1,0 +1,6 @@
+# Extra packages for the satellite and ML pipeline in pipeline/
+-r requirements.txt
+pystac-client
+planetary-computer
+rasterio
+shap

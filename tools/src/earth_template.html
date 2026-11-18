@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GeoMine Earth — live 3D world viewer</title>
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<style>
+:root{--bg:#050a14;--glass:rgba(12,20,36,.72);--line:rgba(140,180,255,.18);--fg:#e8eefc;--mute:#8fa3c7;--acc:#4fd1c5;--hi:#ff5d5d;--med:#ffb020;--lo:#3ddc97}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.4 Inter,system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden}
+#map{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#0b1730,#02050b 70%)}
+.glass{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+#top{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:10px;align-items:center;pointer-events:none;z-index:5}
+#top>*{pointer-events:auto}
+.brand{padding:9px 14px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.brand b{color:var(--acc)}
+#searchbox{position:relative;flex:1;max-width:420px}
+#q{width:100%;padding:11px 14px;border-radius:14px;border:1px solid var(--line);background:var(--glass);color:var(--fg);font:inherit;outline:none;backdrop-filter:blur(14px)}
+#q:focus{border-color:var(--acc)}
+#res{position:absolute;top:46px;left:0;right:0;overflow:hidden;display:none}
+#res button{display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:0;color:var(--fg);font:inherit;cursor:pointer;border-bottom:1px solid var(--line)}
+#res button:hover{background:rgba(79,209,197,.12)}
+#res small{color:var(--mute)}
+a.nav{margin-left:auto;font-size:13px;padding:9px 14px;color:var(--fg);text-decoration:none;white-space:nowrap}
+a.nav:hover{color:var(--acc)}
+#left{position:absolute;top:68px;left:12px;width:270px;max-height:calc(100% - 150px);overflow:auto;padding:12px;z-index:4}
+#right{position:absolute;top:68px;right:12px;width:330px;max-height:calc(100% - 150px);overflow:auto;padding:14px;z-index:4;display:none}
+h3{margin:0 0 8px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute)}
+.sec{margin-bottom:14px}
+label.row{display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer}
+label.row input{accent-color:var(--acc)}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block}
+.btn{background:rgba(79,209,197,.14);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:6px 10px;cursor:pointer;font:inherit}
+.btn:hover{border-color:var(--acc)}
+.btn.on{background:var(--acc);color:#04201d}
+.mn{display:block;width:100%;text-align:left;margin:3px 0}
+#bar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 12px;display:flex;gap:8px;align-items:center;z-index:5;max-width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
+#bar input[type=date]{background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px;font:inherit;color-scheme:dark}
+#status{position:absolute;left:12px;bottom:14px;font-size:11px;color:var(--mute);padding:6px 10px;z-index:4;max-width:260px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-weight:700;font-size:12px;color:#06121f}
+.High{background:var(--hi)}.Medium{background:var(--med)}.Low{background:var(--lo)}
+.days{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.day{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:6px;text-align:center;font-size:12px}
+.day b{display:block;font-size:11px;color:var(--mute);font-weight:600}
+.day .ic{font-size:20px}
+.risk{display:flex;align-items:flex-end;gap:5px;height:84px;margin:8px 0 4px}
+.risk div{flex:1;border-radius:6px 6px 2px 2px;min-height:4px;position:relative}
+.risk span{position:absolute;bottom:100%;left:0;right:0;text-align:center;font-size:10px;color:var(--mute)}
+.lab{display:flex;gap:5px;font-size:10px;color:var(--mute);text-align:center}.lab div{flex:1}
+.note{font-size:11px;color:var(--mute);margin-top:6px}
+.big{font-size:30px;font-weight:700}
+#toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;z-index:9;display:none;font-size:12px}
+.maplibregl-popup-content{background:#0c1424;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;max-width:240px}
+.maplibregl-popup-tip{border-top-color:#0c1424!important;border-bottom-color:#0c1424!important}
+.maplibregl-ctrl-attrib{background:rgba(5,10,20,.6)!important;color:var(--mute)!important}
+.maplibregl-ctrl-attrib a{color:var(--mute)!important}
+#close{float:right}
+@media(max-width:760px){
+ #left{top:auto;bottom:70px;left:8px;right:8px;width:auto;max-height:34%;display:none}
+ #left.open{display:block}
+ #right{top:auto;bottom:70px;left:8px;right:8px;width:auto;max-height:46%}
+ #top{flex-wrap:wrap;right:8px;left:8px}
+ #searchbox{order:5;flex:1 1 100%;max-width:none}
+ #left{top:112px;bottom:auto;max-height:calc(100% - 200px)}
+ #right{bottom:78px;max-height:52%}
+ #bar{bottom:8px;gap:5px;padding:6px 8px;flex-wrap:nowrap}
+ #bar .btn{padding:6px 8px}#bar input[type=date]{width:128px}
+ #dPlay{font-size:0}#dPlay::before{content:"▶ Loop";font-size:14px}
+ .brand span{display:none}
+ #status{display:none}
+ #layersBtn{display:inline-block!important}
+}
+#layersBtn{display:none}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top">
+  <div class="glass brand">🌍 <b>GeoMine</b> <span>Earth</span></div>
+  <div id="searchbox"><input id="q" placeholder="Search any city, place or mine…" autocomplete="off"><div id="res" class="glass"></div></div>
+  <button id="layersBtn" class="btn glass">Layers</button>
+  <a class="glass nav" href="index.html">← Control Room</a>
+</div>
+
+<div id="left" class="glass">
+  <div class="sec"><h3>Base imagery</h3>
+    <label class="row"><input type="radio" name="base" value="sat" checked> NASA daily satellite (true colour)</label>
+    <label class="row"><input type="radio" name="base" value="hires"> Hi-res satellite (Esri)</label>
+    <label class="row"><input type="radio" name="base" value="osm"> Streets (OpenStreetMap)</label>
+    <label class="row"><input type="radio" name="base" value="blue"> Blue Marble (static)</label>
+  </div>
+  <div class="sec"><h3>Live layers</h3>
+    <label class="row"><input type="checkbox" data-l="radar"> Rain radar (past ~2 h)</label>
+    <label class="row"><input type="checkbox" data-l="imerg"> Satellite rainfall (NASA IMERG)</label>
+    <label class="row"><input type="checkbox" data-l="fires"> Active fires (NASA MODIS)</label>
+    <label class="row"><input type="checkbox" data-l="quakes" checked> <span class="sw" style="background:#ff9f43"></span> Earthquakes (USGS, 24 h)</label>
+    <label class="row"><input type="checkbox" data-l="events" checked> <span class="sw" style="background:#ff5d5d"></span> Natural events (NASA EONET)</label>
+    <label class="row"><input type="checkbox" data-l="mn" checked> <span class="sw" style="background:#b388ff"></span> Manganese districts</label>
+  </div>
+  <div class="sec"><h3>3D</h3>
+    <label class="row"><input type="checkbox" id="terrain"> 3D terrain (exaggeration ×1.6)</label>
+    <label class="row"><input type="checkbox" id="spin" checked> Auto-rotate globe</label>
+    <button class="btn" id="tilt">Tilt 60°</button> <button class="btn" id="north">Reset view</button>
+  </div>
+  <div class="sec"><h3>Manganese districts</h3><div id="mnlist"></div>
+    <div class="note">Approximate district centres for orientation only — not mine boundaries.</div></div>
+</div>
+
+<div id="right" class="glass"></div>
+<div id="toast" class="glass"></div>
+
+<div id="bar" class="glass">
+  <button class="btn" id="dPrev">◀</button>
+  <input type="date" id="date">
+  <button class="btn" id="dNext">▶</button>
+  <button class="btn" id="dToday">Latest</button>
+  <button class="btn" id="dPlay">▶ 7-day loop</button>
+</div>
+<div id="status" class="glass">Click anywhere on the globe to select a location.</div>
+
+<script src="vendor/maplibre-gl.js"></script>
+<script>const MODELS_DATA = /*MODELS_JSON*/;</script>
+<script>
+/*CORE_JS*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const GM = makeCore(MODELS_DATA);
+  const $ = (s) => document.querySelector(s);
+  const GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/";
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const todayUTC = new Date();
+  // GIBS daily composites finish processing during the day -> default to yesterday (UTC)
+  const latest = new Date(todayUTC.getTime() - 864e5);
+  let curDate = iso(latest), playing = null, selected = null, radarFrames = [], radarIdx = 0, radarTimer = null, spinTimer = null;
+
+  const MN = [
+    { n: "Balaghat / Munsar (MOIL)", c: [79.28, 21.40], d: "India — MOIL underground mines" },
+    { n: "Gumgaon (MOIL)", c: [78.99, 21.41], d: "India — Nagpur district" },
+    { n: "Kalahari Manganese Field", c: [22.95, -27.20], d: "South Africa — world's largest known reserve" },
+    { n: "Moanda", c: [13.20, -1.57], d: "Gabon — major high-grade producer" },
+    { n: "Groote Eylandt", c: [136.57, -13.97], d: "Australia — open-cut" },
+    { n: "Urucum / Corumbá", c: [-57.60, -19.15], d: "Brazil" },
+    { n: "Chiatura", c: [43.28, 42.29], d: "Georgia — historic district" },
+  ];
+
+  /* ---------------- map ---------------- */
+  const raster = (tiles, o) => Object.assign({ type: "raster", tiles: tiles, tileSize: 256 }, o || {});
+  const trueColor = (d) => [GIBS + "MODIS_Terra_CorrectedReflectance_TrueColor/default/" + d + "/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg"];
+  const style = {
+    version: 8,
+    projection: { type: "globe" },
+    sky: { "sky-color": "#1a3a7a", "horizon-color": "#7fb7ff", "fog-color": "#0b1730", "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.6, "fog-ground-blend": 0.2, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 7, 0] },
+    sources: {
+      blue: raster([GIBS + "BlueMarble_ShadedRelief_Bathymetry/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg"], { maxzoom: 8, attribution: "NASA GIBS / Blue Marble" }),
+      sat: raster(trueColor(curDate), { maxzoom: 9, attribution: "NASA GIBS · MODIS Terra" }),
+      hires: raster(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], { maxzoom: 18, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }),
+      osm: raster(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], { maxzoom: 19, attribution: "© OpenStreetMap contributors" }),
+      imerg: raster([GIBS + "IMERG_Precipitation_Rate/default/" + curDate + "/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"], { maxzoom: 6, attribution: "NASA IMERG" }),
+      fires: raster([GIBS + "MODIS_Terra_Thermal_Anomalies_All/default/" + curDate + "/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"], { maxzoom: 9, attribution: "NASA FIRMS" }),
+      dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: "Terrain: Mapzen/AWS" },
+      quakes: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      events: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      mn: { type: "geojson", data: { type: "FeatureCollection", features: MN.map((m) => ({ type: "Feature", properties: { n: m.n, d: m.d }, geometry: { type: "Point", coordinates: m.c } })) } },
+      sel: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    },
+    layers: [
+      { id: "blue", type: "raster", source: "blue" },
+      { id: "sat", type: "raster", source: "sat" },
+      { id: "hires", type: "raster", source: "hires", layout: { visibility: "none" } },
+      { id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } },
+      { id: "imerg", type: "raster", source: "imerg", layout: { visibility: "none" }, paint: { "raster-opacity": 0.75 } },
+      { id: "fires", type: "raster", source: "fires", layout: { visibility: "none" } },
+    ],
+  };
+
+  const map = new maplibregl.Map({ container: "map", style: style, center: [78, 22], zoom: 1.6, pitch: 0, maxPitch: 80, attributionControl: { compact: true } });
+  window.__map = map;
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), "bottom-right");
+
+  let tileErr = 0;
+  map.on("error", (e) => {
+    const m = (e && e.error && e.error.message) || "";
+    if (/Failed to fetch|40\d|50\d|NetworkError|Load failed/i.test(m)) {
+      tileErr++;
+      if (tileErr === 8) toast("Some tiles failed to load — a layer may be unavailable for this date/zoom, or you are offline.");
+    }
+  });
+  function toast(t) { const el = $("#toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => (el.style.display = "none"), 5000); }
+
+  map.on("load", () => {
+    // vector overlays
+    map.addLayer({ id: "quakes", type: "circle", source: "quakes", paint: {
+      "circle-radius": ["interpolate", ["linear"], ["get", "mag"], 1, 3, 5, 10, 8, 26],
+      "circle-color": ["interpolate", ["linear"], ["get", "mag"], 2, "#ffd166", 5, "#ff9f43", 7, "#ff3b3b"],
+      "circle-opacity": 0.8, "circle-stroke-color": "#fff", "circle-stroke-width": 0.8 } });
+    map.addLayer({ id: "events", type: "circle", source: "events", paint: {
+      "circle-radius": 6, "circle-opacity": 0.9, "circle-stroke-color": "#fff", "circle-stroke-width": 1,
+      "circle-color": ["match", ["get", "cat"], "wildfires", "#ff5d5d", "volcanoes", "#ff3bd4", "severeStorms", "#4aa8ff", "floods", "#36d1dc", "#ffd166"] } });
+    map.addLayer({ id: "mn", type: "circle", source: "mn", paint: { "circle-radius": 7, "circle-color": "#b388ff", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    map.addLayer({ id: "sel", type: "circle", source: "sel", paint: { "circle-radius": 9, "circle-color": "rgba(79,209,197,.25)", "circle-stroke-color": "#4fd1c5", "circle-stroke-width": 3 } });
+    ["quakes", "events", "mn"].forEach((id) => {
+      map.on("mouseenter", id, () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", id, () => (map.getCanvas().style.cursor = ""));
+    });
+    loadQuakes(); loadEvents(); loadRadar();
+    setInterval(loadQuakes, 5 * 60e3); setInterval(loadEvents, 15 * 60e3); setInterval(loadRadar, 10 * 60e3);
+    startSpin();
+  });
+
+  /* ---------------- interaction ---------------- */
+  map.on("click", (e) => {
+    stopSpin();
+    const hit = map.queryRenderedFeatures(e.point, { layers: ["quakes", "events", "mn"].filter((l) => map.getLayer(l)) })[0];
+    if (hit) {
+      const p = hit.properties;
+      let html = "";
+      if (hit.layer.id === "quakes") html = "<b>M " + Number(p.mag).toFixed(1) + "</b><br>" + esc(p.place) + "<br><small>" + new Date(+p.time).toUTCString() + "</small>";
+      else if (hit.layer.id === "events") html = "<b>" + esc(p.title) + "</b><br><small>" + esc(p.catTitle) + " · " + esc((p.date || "").slice(0, 10)) + "</small>";
+      else html = "<b>" + esc(p.n) + "</b><br>" + esc(p.d);
+      new maplibregl.Popup({ closeButton: false, offset: 12 }).setLngLat(hit.geometry.coordinates).setHTML(html).addTo(map);
+      if (hit.layer.id === "mn") select(hit.geometry.coordinates[1], hit.geometry.coordinates[0], p.n);
+      return;
+    }
+    select(e.lngLat.lat, e.lngLat.lng);
+  });
+  ["mousedown", "touchstart", "wheel"].forEach((ev) => map.on(ev, stopSpin));
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function startSpin() {
+    stopSpin();
+    if (!$("#spin").checked) return;
+    spinTimer = setInterval(() => { if (map.getZoom() < 3.2 && !map.isMoving()) map.easeTo({ center: [map.getCenter().lng + 12, map.getCenter().lat], duration: 1000, easing: (t) => t }); }, 1000);
+  }
+  function stopSpin() { if (spinTimer) { clearInterval(spinTimer); spinTimer = null; } }
+  $("#spin").onchange = () => ($("#spin").checked ? startSpin() : stopSpin());
+
+  /* ---------------- layers ---------------- */
+  document.querySelectorAll("input[name=base]").forEach((r) => (r.onchange = () => {
+    ["sat", "hires", "osm"].forEach((id) => map.setLayoutProperty(id, "visibility", "none"));
+    if (r.value !== "blue") map.setLayoutProperty(r.value, "visibility", "visible");
+    $("#bar").style.opacity = r.value === "sat" ? 1 : 0.55;
+  }));
+  document.querySelectorAll("input[data-l]").forEach((c) => (c.onchange = () => {
+    const l = c.dataset.l, v = c.checked ? "visible" : "none";
+    if (l === "radar") { radarFrames.forEach((f, i) => map.getLayer(f.id) && map.setLayoutProperty(f.id, "visibility", "none")); if (c.checked) { radarOn(); } else clearInterval(radarTimer); return; }
+    map.setLayoutProperty(l, "visibility", v);
+  }));
+  $("#terrain").onchange = (e) => {
+    try {
+      if (e.target.checked) { map.setTerrain({ source: "dem", exaggeration: 1.6 }); if (map.getPitch() < 40) map.easeTo({ pitch: 60, duration: 1200 }); toast("3D terrain on — zoom into mountains/valleys and tilt with right-drag."); }
+      else map.setTerrain(null);
+    } catch (err) { toast("3D terrain is not supported by this browser/GPU."); e.target.checked = false; }
+  };
+  $("#tilt").onclick = () => map.easeTo({ pitch: map.getPitch() > 30 ? 0 : 60, duration: 900 });
+  $("#north").onclick = () => map.easeTo({ pitch: 0, bearing: 0, zoom: 1.6, center: [78, 22], duration: 1400 });
+  $("#layersBtn").onclick = () => $("#left").classList.toggle("open");
+
+  /* ---------------- date ---------------- */
+  $("#date").value = curDate; $("#date").max = iso(todayUTC); $("#date").min = "2000-02-24";
+  function setDate(d) {
+    curDate = d; $("#date").value = d;
+    map.getSource("sat").setTiles(trueColor(d));
+    map.getSource("imerg").setTiles([GIBS + "IMERG_Precipitation_Rate/default/" + d + "/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"]);
+    map.getSource("fires").setTiles([GIBS + "MODIS_Terra_Thermal_Anomalies_All/default/" + d + "/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"]);
+  }
+  const shift = (d, n) => iso(new Date(new Date(d + "T00:00:00Z").getTime() + n * 864e5));
+  $("#date").onchange = (e) => e.target.value && setDate(e.target.value);
+  $("#dPrev").onclick = () => setDate(shift(curDate, -1));
+  $("#dNext").onclick = () => { if (shift(curDate, 1) <= iso(todayUTC)) setDate(shift(curDate, 1)); };
+  $("#dToday").onclick = () => setDate(iso(latest));
+  $("#dPlay").onclick = () => {
+    if (playing) { clearInterval(playing); playing = null; $("#dPlay").textContent = "▶ 7-day loop"; return; }
+    let d = shift(iso(latest), -6); setDate(d); $("#dPlay").textContent = "■ Stop";
+    playing = setInterval(() => { d = shift(d, 1); if (d > iso(latest)) d = shift(iso(latest), -6); setDate(d); }, 1600);
+  };
+
+  /* ---------------- live data ---------------- */
+  async function getJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+  function status(t) { $("#status").textContent = t; }
+
+  async function loadQuakes() {
+    try {
+      const j = await getJSON("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
+      const feats = j.features.filter((f) => f.properties.mag != null && f.properties.mag >= 1.5);
+      map.getSource("quakes").setData({ type: "FeatureCollection", features: feats.map((f) => ({ type: "Feature", geometry: f.geometry, properties: { mag: f.properties.mag, place: f.properties.place, time: f.properties.time } })) });
+      status(feats.length + " earthquakes (24 h) · updated " + new Date().toLocaleTimeString());
+    } catch (e) { status("Earthquake feed unavailable."); }
+  }
+  async function loadEvents() {
+    try {
+      const j = await getJSON("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=120");
+      const feats = [];
+      for (const ev of j.events || []) {
+        const g = ev.geometry && ev.geometry[ev.geometry.length - 1];
+        if (!g || g.type !== "Point") continue;
+        const cat = ev.categories && ev.categories[0];
+        feats.push({ type: "Feature", geometry: { type: "Point", coordinates: g.coordinates }, properties: { title: ev.title, cat: cat ? cat.id : "", catTitle: cat ? cat.title : "", date: g.date } });
+      }
+      map.getSource("events").setData({ type: "FeatureCollection", features: feats });
+    } catch (e) { /* silent: optional layer */ }
+  }
+  async function loadRadar() {
+    try {
+      const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json");
+      const frames = (j.radar && j.radar.past) || [];
+      radarFrames.forEach((f) => { if (map.getLayer(f.id)) map.removeLayer(f.id); if (map.getSource(f.id)) map.removeSource(f.id); });
+      radarFrames = frames.map((f, i) => ({ id: "radar" + i, time: f.time, url: j.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png" }));
+      radarFrames.forEach((f) => {
+        map.addSource(f.id, raster([f.url], { maxzoom: 7, attribution: "RainViewer" }));
+        map.addLayer({ id: f.id, type: "raster", source: f.id, layout: { visibility: "none" }, paint: { "raster-opacity": 0.8, "raster-fade-duration": 0 } }, "quakes");
+      });
+      if (document.querySelector("[data-l=radar]").checked) radarOn();
+    } catch (e) { /* radar optional */ }
+  }
+  function radarOn() {
+    clearInterval(radarTimer);
+    if (!radarFrames.length) { toast("Radar is not available right now."); return; }
+    radarIdx = radarFrames.length - 1;
+    const show = () => { radarFrames.forEach((f, i) => map.setLayoutProperty(f.id, "visibility", i === radarIdx ? "visible" : "none")); status("Radar " + new Date(radarFrames[radarIdx].time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " (local)"); };
+    show(); radarTimer = setInterval(() => { radarIdx = (radarIdx + 1) % radarFrames.length; show(); }, 600);
+  }
+
+  /* ---------------- search ---------------- */
+  let st = null;
+  $("#q").addEventListener("input", () => {
+    clearTimeout(st); const v = $("#q").value.trim();
+    if (v.length < 2) { $("#res").style.display = "none"; return; }
+    st = setTimeout(async () => {
+      try {
+        const j = await getJSON("https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&name=" + encodeURIComponent(v));
+        const box = $("#res"); box.innerHTML = "";
+        (j.results || []).forEach((r) => {
+          const b = document.createElement("button");
+          b.innerHTML = esc(r.name) + " <small>" + esc([r.admin1, r.country].filter(Boolean).join(", ")) + "</small>";
+          b.onclick = () => { box.style.display = "none"; $("#q").value = r.name; map.flyTo({ center: [r.longitude, r.latitude], zoom: 7, pitch: 45, duration: 2600 }); select(r.latitude, r.longitude, r.name + (r.country ? ", " + r.country : "")); };
+          box.appendChild(b);
+        });
+        if (!box.children.length) box.innerHTML = '<button disabled>No matches</button>';
+        box.style.display = "block";
+      } catch (e) { toast("Search unavailable (offline?)."); }
+    }, 300);
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#searchbox")) $("#res").style.display = "none"; });
+  const ml = $("#mnlist");
+  MN.forEach((m) => {
+    const b = document.createElement("button"); b.className = "btn mn"; b.textContent = m.n;
+    b.onclick = () => { stopSpin(); map.flyTo({ center: m.c, zoom: 8, pitch: 50, duration: 3000 }); select(m.c[1], m.c[0], m.n); };
+    ml.appendChild(b);
+  });
+
+  /* ---------------- selection: forecast + shortfall outlook ---------------- */
+  const WX = { 0: ["☀️", "Clear"], 1: ["🌤️", "Mostly clear"], 2: ["⛅", "Partly cloudy"], 3: ["☁️", "Overcast"], 45: ["🌫️", "Fog"], 48: ["🌫️", "Fog"], 51: ["🌦️", "Drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌦️", "Drizzle"], 61: ["🌧️", "Rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy rain"], 71: ["🌨️", "Snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy snow"], 80: ["🌦️", "Showers"], 81: ["🌧️", "Showers"], 82: ["⛈️", "Violent showers"], 95: ["⛈️", "Thunderstorm"], 96: ["⛈️", "Thunderstorm + hail"], 99: ["⛈️", "Thunderstorm + hail"] };
+  const wx = (c) => WX[c] || ["🌡️", "—"];
+  let refMine = null;
+  function reference() {
+    if (!refMine) { refMine = GM.MineSim("Reference", 4242); for (let i = 0; i < 30; i++) refMine.tick(0); }
+    return refMine;
+  }
+  // Same model as the Control Room, fed with the selected place's forecast rain for a healthy reference mine.
+  function outlook(daily) {
+    const p = daily.precipitation_sum.map((v) => (v == null ? 0 : v));   // index 0,1 = past days; 2 = today
+    const out = [];
+    for (let d = 0; d < 7; d++) {
+      const rain = { [-2]: p[d], [-1]: p[d + 1], 0: p[d + 2], 1: p[d + 3] };
+      const month = +daily.time[d + 2].slice(5, 7);
+      const r = GM.evaluate(reference(), rain, month, 1000);
+      out.push({ date: daily.time[d + 2], rainTom: p[d + 3], prob: r.prob, level: r.level, top: r.reasons[0] });
+    }
+    return out;
+  }
+  const FEAT = { rain_forecast_mm: "tomorrow's rain", rain_forecast_3d_mm: "the wet 3-day forecast", rain_3day_mm_lag1: "recent rain", achievement_pct_lag1: "yesterday's output", ach_mean7_lag1: "the past week's output", shortfalls_last7: "recent shortfalls", blast_delay_hours_lag1: "blast delays", hoist_uptime_pct_lag1: "hoist uptime" };
+  const friendly = (f) => FEAT[f] || String(f).replace(/_/g, " ");
+
+  async function select(lat, lon, name) {
+    selected = { lat, lon };
+    map.getSource("sel").setData({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: {} }] });
+    const R = $("#right"); R.style.display = "block";
+    R.innerHTML = '<button class="btn" id="close">✕</button><h3>Selected location</h3><div class="big">…</div><div class="note">Loading forecast…</div>';
+    $("#close").onclick = closePanel;
+    try {
+      const u = "https://api.open-meteo.com/v1/forecast?latitude=" + lat.toFixed(3) + "&longitude=" + lon.toFixed(3) +
+        "&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&past_days=2&forecast_days=8&timezone=auto";
+      const [w, label] = await Promise.all([getJSON(u), name ? Promise.resolve(name) : reverse(lat, lon)]);
+      if (!selected || selected.lat !== lat || selected.lon !== lon) return;
+      render(w, label, lat, lon);
+    } catch (e) {
+      R.innerHTML = '<button class="btn" id="close">✕</button><h3>Selected location</h3><div class="note">Could not load the forecast (offline or API limit). Try again in a moment.</div>';
+      $("#close").onclick = closePanel;
+    }
+  }
+  async function reverse(lat, lon) {
+    try {
+      const j = await getJSON("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&lat=" + lat + "&lon=" + lon);
+      return (j.name || (j.address && (j.address.city || j.address.state || j.address.country))) || null;
+    } catch (e) { return null; }
+  }
+  function closePanel() { selected = null; $("#right").style.display = "none"; map.getSource("sel").setData({ type: "FeatureCollection", features: [] }); }
+  const dow = (s) => new Date(s + "T12:00:00").toLocaleDateString("en", { weekday: "short" });
+  function render(w, label, lat, lon) {
+    const d = w.daily, c = w.current, [ic, tx] = wx(c.weather_code);
+    const days = [];
+    for (let i = 2; i < 10 && i < d.time.length; i++) {
+      const [e] = wx(d.weather_code[i]);
+      days.push('<div class="day"><b>' + (i === 2 ? "Today" : dow(d.time[i])) + '</b><span class="ic">' + e + "</span><br>" + Math.round(d.temperature_2m_max[i]) + "° / " + Math.round(d.temperature_2m_min[i]) + "°<br>💧 " + Math.round(d.precipitation_sum[i] || 0) + " mm</div>");
+    }
+    let outl = [], html = "";
+    try { outl = outlook(d); } catch (e) { outl = []; }
+    const worst = outl.reduce((a, b) => (b.prob > a.prob ? b : a), outl[0] || { prob: 0, level: "Low" });
+    let risk = "";
+    if (outl.length) {
+      risk = '<h3 style="margin-top:14px">Shortfall outlook · next 7 days</h3>' +
+        '<div class="risk">' + outl.map((o) => '<div class="' + o.level + '" style="height:' + Math.max(4, Math.round(o.prob * 100)) + '%"><span>' + Math.round(o.prob * 100) + "</span></div>").join("") + "</div>" +
+        '<div class="lab">' + outl.map((o) => "<div>" + dow(o.date) + "</div>").join("") + "</div>" +
+        '<div style="margin-top:8px"><span class="pill ' + worst.level + '">' + worst.level.toUpperCase() + '</span> peak on <b>' + dow(worst.date) + "</b> — driven mainly by <b>" + esc(friendly(worst.top.f)) + "</b>.</div>" +
+        '<div class="note">Indicative only: the GeoMine shortfall model (XGBoost, trained on <u>simulated</u> operations) is run for a healthy reference underground mine placed here, using this place\'s real forecast rain. It shows how weather alone would stress output — not a prediction for any real mine.</div>';
+    }
+    $("#right").innerHTML =
+      '<button class="btn" id="close">✕</button><h3>Selected location</h3>' +
+      '<div style="font-weight:700;font-size:16px">' + esc(label || "Unnamed place") + "</div>" +
+      '<div class="note">' + lat.toFixed(3) + "°, " + lon.toFixed(3) + "°</div>" +
+      '<div style="display:flex;align-items:center;gap:10px;margin:8px 0"><span class="big">' + ic + " " + Math.round(c.temperature_2m) + "°C</span><span class=\"note\">" + tx + "<br>💨 " + Math.round(c.wind_speed_10m) + " km/h · 💧 " + c.relative_humidity_2m + "% RH</span></div>" +
+      '<a class="btn" style="display:block;text-align:center;text-decoration:none;margin:8px 0" href="index.html?lat=' + lat.toFixed(4) + '&lon=' + lon.toFixed(4) + '&name=' + encodeURIComponent(label || "Selected site") + '">Open in Control Room →</a>' +
+      '<h3>Forecast</h3><div class="days">' + days.join("") + "</div>" + risk +
+      '<div class="note" style="margin-top:10px">Weather: Open-Meteo (CC BY 4.0).</div>';
+    $("#close").onclick = closePanel;
+  }
+})();
+</script>
+</body>
+</html>

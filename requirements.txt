@@ -1,0 +1,10 @@
+# Used by the Streamlit app (streamlit_app/app.py) and the tests.
+# The static web app in web/ needs nothing installed.
+streamlit>=1.46
+plotly>=5.24
+xgboost>=2.0
+scikit-learn>=1.4
+scipy>=1.11
+pandas>=2.0
+numpy>=1.26
+matplotlib>=3.8

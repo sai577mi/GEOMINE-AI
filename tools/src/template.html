@@ -1,0 +1,257 @@
+<title>GeoMine-AI Control Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a control room. Slim top bar, alert strip, left control rail, tabbed main area.
+   Palette: graphite neutrals with a slight manganese-violet bias; red/amber/green are status only. */
+:root {
+  --bg: #f1f0f4; --surface: #ffffff; --surface-2: #f7f6f9; --line: #dcd9e3;
+  --fg: #1b1a22; --muted: #66626f; --accent: #5a3e9e; --accent-fg: #ffffff; --accent-soft: #ebe6f7;
+  --ok: #1f7a3f; --ok-soft: #e1f2e7; --warn: #a85a00; --warn-soft: #fdeed8; --bad: #b3261e; --bad-soft: #fbe3e1;
+  --grid: #e6e4ec; --shadow: 0 1px 2px rgba(27,26,34,.06);
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121117; --surface: #1a1921; --surface-2: #211f2a; --line: #302d3b;
+    --fg: #ecebf2; --muted: #9a96a9; --accent: #a88df2; --accent-fg: #16121f; --accent-soft: #2b2540;
+    --ok: #55c27d; --ok-soft: #16301f; --warn: #f0a24a; --warn-soft: #3a2810; --bad: #ff7b72; --bad-soft: #3c1a18;
+    --grid: #2a2735; --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121117; --surface: #1a1921; --surface-2: #211f2a; --line: #302d3b;
+  --fg: #ecebf2; --muted: #9a96a9; --accent: #a88df2; --accent-fg: #16121f; --accent-soft: #2b2540;
+  --ok: #55c27d; --ok-soft: #16301f; --warn: #f0a24a; --warn-soft: #3a2810; --bad: #ff7b72; --bad-soft: #3c1a18;
+  --grid: #2a2735; --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 28px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h2 { font-size: 15px; letter-spacing: .01em; }
+button, select, input { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible, [role="tab"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+/* top bar */
+.top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 6px 11px; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.dot.paused { background: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .dot:not(.paused) { animation: pulse 1.6s ease-in-out infinite; } }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* alert strip */
+.strip { border-radius: 10px; padding: 11px 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; border: 1px solid transparent; }
+.strip.Low { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.strip.Medium { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.strip.High { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.strip b { font-family: var(--font-display); font-size: 16px; }
+.strip span { color: var(--fg); }
+
+/* main grid */
+.main { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } .rail { order: 2; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+.rail { display: flex; flex-direction: column; gap: 14px; }
+.rail label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.rail label span.v { color: var(--fg); font-family: var(--font-data); }
+.rail input[type=range] { width: 100%; accent-color: var(--accent); }
+.rail select, .rail input[type=number] { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 6px 8px; }
+.rail .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rail small { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+
+/* tabs */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; }
+.tabs [role="tab"] { border: 0; background: transparent; padding: 9px 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.pane[hidden] { display: none !important; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.kpi { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.kpi .l { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.kpi .n { font-family: var(--font-data); font-size: 24px; font-weight: 500; margin-top: 2px; }
+.kpi .s { font-size: 12px; color: var(--muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+@media (max-width: 960px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+canvas { width: 100%; display: block; }
+ul.plain { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+ul.plain li { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; display: flex; justify-content: space-between; gap: 10px; }
+ul.plain li .up { color: var(--bad); } ul.plain li .down { color: var(--ok); }
+.note { background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+.tablewrap { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 500; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+.bar { width: 90px; height: 7px; border-radius: 4px; background: var(--grid); overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.bar i { display: block; height: 100%; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 600; }
+.pill.Low { background: var(--ok-soft); color: var(--ok); } .pill.Medium { background: var(--warn-soft); color: var(--warn); } .pill.High { background: var(--bad-soft); color: var(--bad); }
+.log { font-family: var(--font-data); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 8px; max-height: 150px; overflow-y: auto; }
+.log div { padding: 2px 0; }
+.muted { color: var(--muted); }
+svg text { fill: var(--fg); font-family: var(--font-body); }
+.twin { width: 100%; height: auto; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; }
+.cutoff { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 10px; }
+.cutoff input[type=range] { width: 240px; max-width: 100%; accent-color: var(--accent); }
+#plot3d, #plotSlice { width: 100%; height: 480px; }
+.status { color: var(--muted); font-size: 12.5px; }
+.about p { margin: 6px 0; max-width: 78ch; } .about li { margin: 4px 0; max-width: 78ch; }
+.tag { font-family: var(--font-data); font-size: 11px; padding: 1px 7px; border-radius: 4px; }
+.tag.real { background: var(--ok-soft); color: var(--ok); } .tag.sim { background: var(--warn-soft); color: var(--warn); }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--bad); color: #fff; border-radius: 10px; padding: 10px 14px; max-width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.25); z-index: 20; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1 id="t-title">GeoMine-AI Control Room</h1>
+      <p id="t-sub">Real-time manganese production intelligence for MOIL mines</p>
+    </div>
+    <div class="tools">
+      <span class="live"><i class="dot" id="liveDot"></i><span id="liveTxt">Live</span></span>
+      <a class="btn" id="earthLink" href="earth.html" style="text-decoration:none">🌍 World viewer</a>
+      <button class="btn" id="playBtn" type="button">Pause</button>
+      <div class="seg" role="group" aria-label="Language">
+        <button type="button" id="lang-en" aria-pressed="true">EN</button>
+        <button type="button" id="lang-hi" aria-pressed="false">हिं</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="strip" class="strip Low" role="status" aria-live="polite"></div>
+
+  <div class="main">
+    <aside class="panel rail" aria-label="Controls">
+      <label><span id="t-mine">Mine</span>
+        <select id="mineSel"><option value="Munsar">Munsar (Nagpur)</option><option value="Gumgaon">Gumgaon (Nagpur)</option></select></label>
+      <label><span id="t-site">Add any place in the world</span>
+        <input id="siteQ" type="search" placeholder="Search a city, mine or region…" autocomplete="off"></label>
+      <div id="siteRes" class="status" hidden></div>
+      <button class="btn" id="rmSite" type="button" hidden>Remove this site</button>
+      <label><span id="t-season">Rainfall source</span>
+        <select id="seasonSel"></select></label>
+      <small id="wxSrc" class="status"></small>
+      <label><span id="t-storm">Storm tomorrow, extra rain <span class="v" id="stormV">0 mm</span></span>
+        <input id="storm" type="range" min="0" max="150" step="10" value="0"></label>
+      <label><span id="t-fcast">Or enter your own rain forecast for tomorrow (mm)</span>
+        <input id="rainOverride" type="number" min="0" max="300" step="1" placeholder="e.g. 45"></label>
+      <div class="row">
+        <button class="btn" type="button" id="failDrill">Fail a drill</button>
+        <button class="btn" type="button" id="failHoist">Fail hoist</button>
+      </div>
+      <label><span id="t-speed">Simulation speed <span class="v" id="speedV">3x</span></span>
+        <input id="speed" type="range" min="1" max="10" step="1" value="3"></label>
+      <button class="btn" type="button" id="resetBtn">Reset simulation</button>
+      <small id="t-note">Equipment, production and drill data are simulated. Rainfall is a seasonal simulation unless you enter a forecast. The AI models are real and run in your browser.</small>
+    </aside>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-live" aria-selected="true" aria-controls="pane-live" type="button">Live control room</button>
+        <button role="tab" id="tab-twin" aria-selected="false" aria-controls="pane-twin" type="button">Digital twin</button>
+        <button role="tab" id="tab-res" aria-selected="false" aria-controls="pane-res" type="button">3D reserve model</button>
+        <button role="tab" id="tab-net" aria-selected="false" aria-controls="pane-net" type="button">Both mines</button>
+        <button role="tab" id="tab-about" aria-selected="false" aria-controls="pane-about" type="button">How it works</button>
+      </div>
+
+      <!-- LIVE -->
+      <div class="pane" id="pane-live" role="tabpanel">
+        <div class="kpis" id="kpis"></div>
+        <div class="cols">
+          <div class="stack">
+            <div><h2 id="h-chart">Shortfall risk over time</h2><canvas id="riskChart" height="220"></canvas></div>
+            <div><h2 id="h-why">Why this rating</h2><ul class="plain" id="reasons"></ul></div>
+            <div><h2 id="h-act">Recommended actions</h2><ul class="plain" id="actions"></ul><div id="advice"></div></div>
+          </div>
+          <div class="stack">
+            <div><h2 id="h-maint">Predictive maintenance</h2><div class="tablewrap"><table id="maint"></table></div><div id="maintWarn"></div></div>
+            <div><h2 id="h-alerts">Alert log</h2><div class="log" id="alertLog"><div class="muted">No High-risk alerts yet. Move the storm slider to try one.</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TWIN -->
+      <div class="pane" id="pane-twin" role="tabpanel" hidden>
+        <p class="status" id="twinNote">Cross-section of an underground mine. Colours follow live sensor health.</p>
+        <svg class="twin" id="twinSvg" viewBox="0 0 900 480" role="img" aria-label="Mine digital twin"></svg>
+        <div class="kpis" id="twinKpis" style="margin-top:12px"></div>
+        <h2 id="h-scen">What-if scenarios (tomorrow)</h2>
+        <svg id="scenSvg" viewBox="0 0 900 250" style="width:100%;height:auto" role="img" aria-label="Scenario outputs"></svg>
+      </div>
+
+      <!-- RESERVE -->
+      <div class="pane" id="pane-res" role="tabpanel" hidden>
+        <p class="status" id="resNote">Drill-hole grades are simulated from a hidden orebody. A Gaussian-process model (the machine-learning form of kriging) estimates grade everywhere, with uncertainty.</p>
+        <div class="cutoff">
+          <label>Cut-off grade <b class="mono" id="cutV">28</b> % Mn <input id="cut" type="range" min="18" max="36" value="28"></label>
+          <div class="seg" role="group" aria-label="View">
+            <button type="button" data-view="3d" aria-pressed="true">3D ore body</button>
+            <button type="button" data-view="mean" aria-pressed="false">Depth slice</button>
+            <button type="button" data-view="std" aria-pressed="false">Uncertainty</button>
+          </div>
+          <label id="depthWrap" hidden>Depth <b class="mono" id="depthV">25</b> m <input id="depth" type="range" min="2.5" max="97.5" step="5" value="27.5"></label>
+        </div>
+        <div class="kpis" id="resKpis"></div>
+        <div id="plot3d"></div>
+        <div class="cols" style="margin-top:12px">
+          <div><h2>Where to drill next</h2><div class="tablewrap"><table id="picks"></table></div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+              <button class="btn primary" type="button" id="drillBtn">Drill these 3 holes (simulate)</button>
+              <button class="btn" type="button" id="resetHoles">Reset to 30 holes</button></div></div>
+          <div><h2>Tonnage by confidence</h2><div class="tablewrap"><table id="conf"></table></div><p class="status" id="resCheck"></p></div>
+        </div>
+      </div>
+
+      <!-- NET -->
+      <div class="pane" id="pane-net" role="tabpanel" hidden>
+        <div class="tablewrap"><table id="netTable"></table></div>
+        <p class="status">Mine coordinates from MOIL's public environmental-clearance documents: Munsar 21.404 N, 79.279 E; Gumgaon 21.408 N, 78.986 E.</p>
+        <div class="kpis" id="netKpis"></div>
+      </div>
+
+      <!-- ABOUT -->
+      <div class="pane about" id="pane-about" role="tabpanel" hidden>
+        <h2>What runs where</h2>
+        <p><span class="tag real">REAL</span> The shortfall model (XGBoost, 50 trees) and the what-if simulator (XGBoost, 300 trees) are trained models, exported to this page and run in your browser. On the 2025 hold-out year the shortfall model scored AUC 0.84; when it said High, a shortfall followed 87% of the time. Both numbers come from simulated production data.</p>
+        <p><span class="tag real">REAL</span> Sentinel-2 satellite analysis (indices, prospectivity map, seasonal persistence) was run in Python on real imagery of the Munsar area and is presented in the project report.</p>
+        <p><span class="tag sim">SIMULATED</span> Equipment sensors, production history, absenteeism, blasting delays and the 3D drill-hole assays. This page generates them so the full system can be demonstrated. They are replaced by MOIL's SCADA, production and drill databases without changing the models' inputs.</p>
+        <p><span class="tag sim">SIMULATED</span> Rainfall. A seasonal pattern is generated here. In the Python version, tomorrow's rainfall is read from the free Open-Meteo forecast API. Enter an IMD forecast in the controls to override it.</p>
+        <h2 style="margin-top:14px">How to read the outputs</h2>
+        <ul>
+          <li><b>Shortfall risk</b>: probability that tomorrow's output falls below 90% of plan. Low under 30%, Medium 30 to 60%, High above 60%.</li>
+          <li><b>Why this rating</b>: the features pushing risk up or down, from the model's own decision paths.</li>
+          <li><b>Recommended actions</b>: the best combination of five actions within a cost budget of 3.0, judged by the what-if simulator. Costs and effects are editable assumptions to be agreed with mine planners.</li>
+          <li><b>Predictive maintenance</b>: a linear trend of each machine's health gives hours to failure. It is a simple estimate and not a certified reliability model.</li>
+          <li><b>3D reserve model</b>: tonnage uses an assumed bulk density of 3.6 t/m³. The comparison with the hidden truth is only possible because the orebody is simulated.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="plotly.min.js"></script>
+<script>const MODELS_DATA = /*MODELS_JSON*/;</script>
+<script>
+/*CORE_JS*/
+</script>
+<script>
+/*UI_JS*/
+</script>
